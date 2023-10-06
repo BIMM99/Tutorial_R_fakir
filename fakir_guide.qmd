@@ -1,0 +1,295 @@
+---
+title: "Didacticiel 03 - Générer des données factices à des fins pédagogiques avec fakir"
+author: "Benoît MARION - master SEP"
+lang: fr
+date: "11/02/2023"
+output: html_document
+toc: true
+html-math-method: katex
+format:
+  html:
+    embed-resources: true
+---
+
+<br>
+
+<center>
+
+<img src="https://thinkr-open.github.io/fakir/reference/figures/logo.png" alt="Fakir logo" width="200"/>
+
+<figcaption>
+
+Logo Fakir
+
+</center>
+
+<br>
+
+# 1. Présentation
+
+Aujourd'hui nous allons découvrir ensemble le package R nommé fakir. Après avoir présenté le package et ses objectifs, nous allons voir ce qu'il permet de faire en regardant de manière détaillée ses différentes fonctions. Finalement, nous verrons brièvement les autres solutions possibles pour créer des données utilisables dans un cadre pédagogique.
+
+## 1.1 informations générales
+
+Le package fakir a été développé par deux développeurs français [Colin Fay](https://colinfay.me/) (*maintainer*) et [Sebastien Rochette](https://statnmap.com/). La dernière version stable est la 1.0.0[^1]. Les informations générales, le manuel[^2], les *changelogs* et les liens vers les dépôts de fakir sont accessibles sur le [site du CRAN](https://cran.r-project.org/web/packages/fakir/index.html).
+
+[^1]: Dernière modification le 13/04/2023.
+
+[^2]: Le manuel est aussi dans le dépôt du didacticiel 3.
+
+## 1.2 intérêt du package fakir
+
+Ce package permet de créer des jeux données factices se rapprochant de ceux qui se trouvent dans un environnement réel (données de sondage, avis client ...). Cela permet donc de travailler sur des données plus pertinentes pour des cas pratiques tout respectant la RGPD.
+
+L'objectif est de permettre d'avoir facilement des *datasets* pour travailler la manipulation (`tidyverse` principalement)et la visualisation de données (`ggplot` ou `shiny`[^3]).
+
+[^3]: L'auteur du package parle très clairement de faciliter le "prototypage" d'applications shiny comme un objectif principal de fakir dans [cette conversation](https://github.com/ThinkR-open/fakir/issues/2#issuecomment-932380491)
+
+Ainsi, comme l'expliquent les auteurs sur le [wiki de fakir](https://thinkr-open.github.io/fakir/index.html):
+
+> "Certains jeux de données suivent les principes du *tidy-data*, d'autres non. Certaines valeurs sont manquantes pour les données numériques et catégorielles. Certaines variables sont corrélées"
+
+```{r intro, include = FALSE}
+rm(list=ls())
+```
+
+# 2. Utilisation pratique
+
+## 2.1 installation et import
+
+Pour installer fakir (comme pour tous les autres packages publiées sur le CRAN), utilisez l'onglet package dans RStudio ou lancez la fonction `install.packages("fakir")` dans la console R.
+
+On importe le package (et quelques autres que nous utiliserons) dans notre espace de travail avec :
+
+```{r 2_1, message = F, warning = F}
+library(fakir)
+library(dplyr)
+library(ggplot2)
+```
+
+## 2.2 liste des fonctions disponibles dans le pacakge
+
+Ci-dessous, nous pouvons-voir les différentes fonctions accessibles [^4] grâce au package fakir et leur arguments (plus d'informations sur ces derniers dans le [pdf](https://cran.r-project.org/web/packages/fakir/fakir.pdf) ou avec la commande `?fake_...`).
+
+[^4]: Les fonctions `fake_sondage_...()` sont dîtes *deprecated* (donc à ne pas utiliser), et ont été remplacées par `fake_survey_...()`.
+
+```{r 2_2}
+lsf.str("package:fakir")
+```
+
+## 2.3 génération des jeux de données, description des paramètres et début d'analyse visuelles
+
+### 2.3.1 `fake_product()`
+
+Cette fonction dispose de deux arguments `n` et la `seed` et nous renvoie une liste de produits factices.
+
+```{r 2_3_1_1}
+products <- fake_products(1000, seed = 2023)
+products
+summary(products)
+```
+
+Le jeu de données renvoyé est un `tibble` et ressemble à une liste relativement réaliste d'équipements connectés en vente avec des infos sur la marque, la catégorie, le prix, la couleur et la provenance.
+
+Les données sont toutes encodées en *character* ce qu'il peut être intéressant de recoder dans un cadre pédagogique de *data-wrangling* mais n'y a pas de données manquantes.
+
+On peut ainsi regarder le nombre de produits par marque :
+```{r 2_3_1_1_ext}
+products %>% 
+  count(brand)  %>% 
+  arrange(desc(n)) %>% 
+  ggplot() + geom_col(aes(x = n, y = brand), alpha = .8, fill = "#FF6666", colour = "red") + theme_classic()
+```
+
+
+Les données de prix sont relativement peu exploitables dans un cadre analytique (ne semblent pas corréelées au type de produit) et ressemblent à échantillon de loi uniforme allant de 0 au `n` choisi.
+
+```{r 2_3_1_2}
+ggplot(products, aes(x = price)) + 
+geom_histogram(aes(y = after_stat(density)), colour="black", alpha = .8, fill="#FF6666", binwidth=50) + 
+geom_density(alpha = .2, fill = "blue") + theme_classic()
+```
+
+On peut évidemment changer le `n` choisi pour avoir plus de données, la commande génère le nouveau *dataset* relativement rapidement (même pour `n = 10000`).
+```{r 2_3_1_ext}
+fake_products(1000, seed = 2023)
+fake_products(1000, seed = 1999)
+fake_products(10000, seed = 2023)
+```
+
+Le nom des marques change (aussi si l'on change la graine) mais le nombre total de marques différentes ne paraît jamais dépasser 13-14.
+
+### 2.3.2 `fake_visit()`
+
+Cette fonction nous renvoie une base de données temporelles listant les visites sur un site internet. Contrairement au reste des fonctions du package `fake_visit()`, il ne dispose pas de paramètre `n` mais de la date de début et de fin.
+
+```{r 2_3_2_1}
+visits <- fake_visits(from = "2022-01-01", to = "2022-12-31", seed = 2023, local = "en_US")
+visits
+summary(visits)
+```
+
+On voit beaucoup de valeurs manquantes dans les colonnes, ce qui permet de travailler la gestion de celles-ci. Les données se composent d'une date et de 4 variables aléatoires censées représenter les visites aux différentes pages du site web.
+
+```{r 2_3_2_2, warning = FALSE}
+ggplot(visits, aes(x=timestamp, y=home)) +
+  geom_line() + theme_minimal()
+  
+ggplot(visits, aes(x=timestamp, y=contact)) +
+  geom_line() + theme_minimal()
+```
+
+Les données ressemblent à des séries temporelles stationnaires avec une variablilité relativement importante. Elles permettent de travailler les différentes techniques de modélisation et de visualisation des données temporelles.
+
+### 2.3.3 `fake_user_feedback()`
+
+Cette fonction nous renvoie un *dataset* d'évaluations de clients. Elle dispose de 4 arguments `n`, `seed` et la date de début et de fin (délimite la période des retours clients mais n'influence pas le `n`).
+
+```{r 2_3_3_1}
+usr_feedback <- fake_user_feedback(1000, seed = 2023, from = "2022-01-01 00:00:01", to = "2023-01-01 00:00:00")
+head(usr_feedback, 10)
+summary(usr_feedback)
+```
+
+Le jeu de données renvoyé est un `data.frame` avec noms, évaluations et timestamps. Il est nettoyé sauf pour les noms qui contiennent parfois le titre (potentiellement un bon travail pour s'exercer à nettoyer les chaînes de caractères). La variable `star` semble issue d'une loi uniforme.
+
+```{r 2_3_3_2}
+ggplot(usr_feedback, aes(star)) + geom_bar(colour = "gold", fill = "#F5FA9B", width = 0.7)+ theme_minimal() + coord_flip()
+```
+
+Il serait assez intéressant d'avoir des commentaires, tout du moins pour certains individus, afin de permettre de travailler le traitement de données textuelles.
+
+### 2.3.4 `fake_survey_answer()` et `fake_survey_people()`
+
+Ces fonctions sont un petit peu plus complète que les précédentes:
+
+-   'fake_survey_answer()' renvoie un jeu de données factice de réponse à 3 formulaires de questions (3 lignes par indivus) sur les déplacement, et ce accompagné certaines variables individuelles (id, sexe et département/région).
+
+```{r 2_3_4_1}
+survey_a <- fake_survey_answers(n = 300, split = FALSE, seed = 2023)
+survey_a
+summary(survey_a)
+```
+
+-   'fake_survey_people()' renvoie une base de `n` lignes listant les individus et leurs caractéristiques sans les réponses.
+
+```{r 2_3_4_2}
+survey_p <- fake_survey_people(n = 300, seed = 2023)
+survey_p
+summary(survey_p)
+```
+
+Ces deux fonctions acceptent des paramètres semblables aux précédentes : `n`et la `seed`. `fake_survey_answer()` permet d'obtenir les bases jointes (individus et réponses) ou disjointes (deux bases séparée) selon l'option `split = TRUE` ou `split = FALSE` comme nous pouvons le voir ci-dessous.
+
+```{r 2_3_4_3}
+survey <- fake_survey_answers(n = 300, split = TRUE, seed = 2023)
+survey
+```
+
+On peut donc faire des jointures sur les bases si besoin :
+
+```{r 2_3_4_4}
+survey_merged <- merge(survey$individus,survey$answers,by="id_individu")
+as_tibble(survey_merged)
+```
+
+Cette fonction nous renvoie un *dataset* qui paraît assez réaliste (bien que les données semblent très peu bruitées) avec des corrélations claires entre les différentes variables et donc plutôt intéressantes pour travailler la visualisation.
+
+```{r 2_3_4_5}
+ggplot(survey_merged, aes(x=type, y=distance_km))+ 
+geom_boxplot(color="red",outlier.color="#FF6666") + 
+theme_minimal() +
+coord_flip()
+```
+
+Il est possible de réaliser des choses relativement intéressantes comme nous pouvons voir ci-dessous.
+
+```{r 2_3_4_6}
+graph <- ggplot(survey_merged, aes(x = distance_km, y = temps_trajet_en_heures)) +  geom_point(aes(color = transport)) 
+graph + facet_wrap(~type, ncol = 1, scales = "free_x")
+```
+
+Ici par exemple, on note bien les différences en terme de moyens de transports utilisés selon le type de besoin et la corrélation entre temps et distance.
+
+### 2.3.5 `fake_base_clients` et `fake_ticket_client`
+
+Ici, nous avons affaire à des fonctions renvoyant une base de données client (nom, age, emploi, département, type de carte, statut de fidélité) et une liste  de ticket au support d'une entreprise de télécom. Il est possible de les obtenir jointes ou disjointes et d'en déterminer le nombre d'observations (`n`pour le nombre d'individus et `vol` pour le nombre de tickets).
+
+```{r 2_3_5_1}
+client_ticket <- fake_ticket_client(1000, n = 500, split = TRUE, local = "fr_FR", seed=2023)
+client_ticket
+fake_base_clients(500, local = "en_US")
+```
+
+Nous pouvons décider d'avoir les noms et profession en anglais ou français avec le paramètre `local`. Malheureusement, la localisation géographique ne s'adapte pas au cas américain comme visible ci-dessus...
+
+Le package inclut aussi une carte des départements français comme objet du package `sf` ce qui permet de faciliter la représentation cartographique des données factices crées sur R.
+
+```{r 2_3_5_2}
+# code repris presque directement du wiki de fakir (https://thinkr-open.github.io/fakir/)
+library(sf)
+client_map <- as.data.frame(client_ticket$clients) %>%  group_by(id_dpt) %>%  summarise(number_of_clients = n()) %>% full_join(fra_sf, by = "id_dpt") %>% st_sf()
+
+ggplot(client_map) + geom_sf(aes(fill = number_of_clients)) + scale_fill_viridis_c() + coord_sf(crs = 2154, datum = 4326)
+```
+
+On peut ainsi voir par exemple le nombre de client par département. Malheureusement les résultats ne sont pas reproductibles, la seed ne fixant pas le département des individus de la base (nom, age, sexe et statut de fidélité sont eux bien fixés par la `seed`).
+
+## 2.4 résumé des fonctions et de paramètres
+
+Nous pouvons voir que les fonctions renvoient 5 types de jeu de données différents :
+
+-   une fausse liste de produits (`fake_product()`)
+-   un faux registre des visites quotidiennes sur un site (`fake_visits()`)
+-   un fausse liste d'évaluation par les clients (`fake_user_feedback()`)
+-   les fausses réponses à sondage sur les habitudes de transport (`fake_survey_people()` pour avoir juste les répondants ou `fake_survey_answer()` les répondants et leur réponses)
+-   une fausse base de clients et leur tickets pour un service de support (`fake base_clients()` pour avoir juste une liste de clients ou `fake_ticket_client()` pour avoir les clients et leur ticket)
+
+Pour schématiser, 4 différents arguments peuvent être envoyés aux fonctions :
+
+-   `seed` permet de déterminer l'initialisation du générateur pseudo-aléatoire afin d'avoir des résultats réplicable (si utilisation de la même graine), elle dispose d'une valeur par défaut de 2811.
+-   `n` pour selectionner le nombre de ligne du jeu de données en sortie (pour `fake_visits()` c'est la date de début et la date de fin qui détermine n)
+-   `local` permet de choisir entre avoir les données avec des informations (nom, prénom) françaises ou étasuniennes pour des faux-client [^5].
+-   `split` qui, pour les jeux de données qui sont issus de jointure (client et leurs ticket pour `fake_client_...()`, réponse et répondants pour `fake_survey_...()`), permet de choisir si l'on veut deux base (`split = TRUE`) ou une seule (`split = FALSE`)
+
+[^5]: Il est dommage que cette fonctionnalité soit applicable uniquement pour 2 *datasets* et ne change pas la région et le département pour l'adapter au cas étasunien.
+
+# 3. Les autres options pour avoir des données utilisables à des fins pédagogiques
+
+## 3.1 les jeux de données *"built-in"* ou de packages
+
+La distribution R vient avec plusieurs jeux de données utilisables à des fins pédagogiques. Les plus connus sont iris (et sa fameuse variable Sepal.Length et Sepal.Width) ou mtcars. D'autres peuvent aussi venir avec certains packages ([dplyr](https://cran.r-project.org/web/packages/dplyr/index.html), [palmerpinguins](https://cran.r-project.org/web/packages/palmerpenguins/index.html)...). La commande `data()` permet d'en obtenir la liste accessible dans l'environnement de travail.
+
+Cependant, ces *datasets* sont souvent à un niveau d'observation agrégé (régional...) ou peu applicables à des cas pratiques et aux besoins réels. De plus, elles sont généralement nettoyées et ne permettent donc de travailler les compétences *data wrangling* (gérer les valeurs manquantes, les jointures, les chaînes de caractères) dans un cadre pédagogique.
+
+## 3.2 créer un jeu de données *"from scratch"*
+
+Certains packages R ([charlatan](https://cran.r-project.org/web/packages/charlatan/index.html)[^6], [ids](https://cran.r-project.org/web/packages/ids/index.html) ou [wakefield](https://cran.r-project.org/web/packages/wakefield/index.html) par exemple) permettent de générer des données aléatoires préformatées (numéros de téléphones, nom, adresses, id...). Ainsi en multipliant les données aléatoires de différents types, on peut s'approcher de jeux de données réalistes. Comme fakir ces packages permettent aussi de créer des données manquantes.
+
+[^6]: Ce package est utilisé par fakir pour créer certaines données aléatoires. Il est très similaire au package Python nommée [Faker](https://pypi.org/project/Faker/).
+
+Ces packages sont très pratiques pour créer des jeux de données factices parfaitement adaptés aux besoins mais sont plus complexes et long à mettre en place. De plus, ils ne permettent pas souvent d'avoir facilement des structures de dépendance au sein des données (corrélation...) comme fakir le permet [^7].
+
+[^7]: Dans cette perspective, [synthpop](https://cran.r-project.org/web/packages/synthpop/index.html) peut être intéressant, c'est un package qui construit des données de synthèse se basant sur des données micro réelles.
+
+## 3.3 forces de fakir et futures améliorations
+
+Ces autres options permettent de mieux percevoir les avantages et les limites de fakir. Il est plus adapté aux besoins pratiques et aux objectifs pédagogiques que les *datasets* déjà présents dans R, et plus simple d'utilisation que les packages permettant de créer des données factices en partant de 0 tout en permettant d'avoir certaines structure de dépendance rendant les données en partie exploitables pour l'apprentissage et la visualisation.
+
+Cependant, il convient aussi de noter que certaines données générées semblent parfois un peu étonnantes (`fake_client()` ou `fake_products()` par exemple) et il souvent possible de déterminer le *data generating process* sous-jacent ce qui peut limiter l'intérêt pour modéliser (de réelles bases de données sont plus intéressantes dans cette perspective).
+
+En explorant les [conversations des contributeurs](https://github.com/ThinkR-open/fakir/issues/), on peut voir les différentes idées de développements ultérieurs autour de fakir. L'idée principale est l'amélioration et l'ajout de générateur de données traduites (l'essentiel des jeux sont adaptés au cas français avec région, départements, nom et prenoms). Certaines bases sont déjà accessibles avec des données adaptées pour les États-Unis, mais beaucoup de travail reste à faire à ce niveau. Les contributeurs pensent aussi ajouter certaines bases de données sur d'autres sujets (tweets, films, sports...) mais nous n'avons pas plus d'informations à ce stade.
+
+# 4. Sources
+
+<p>Fay C, Rochette S (2023). CRAN repository : <em>fakir: Generate Fake Datasets for Prototyping and Teaching</em>. R package version 1.0.0, <a href="https://cran.r-project.org/web/packages/fakir/index.html" class="external-link">https://cran.r-project.org/web/packages/fakir/index.html</a>.</p>
+
+<p>Fay C, Rochette S (2023). Code & git repository : <em>fakir: Create Fake Data in R for tutorials</em>. R package version 1.0.0, <a href="https://github.com/Thinkr-open/fakir" class="external-link">https://github.com/Thinkr-open/fakir</a>.</p>
+
+<p>Fay C, Rochette S (2023). Docs <em>Package 'fakir' - user guide,</em> <a href="https://cran.r-project.org/web/packages/fakir/fakir.pdf" class="external-link">https://cran.r-project.org/web/packages/fakir/fakir.pdf</a>.</p>
+
+<p>Abdul Majed Raja (2019). Blog : <em>Create fake but meaningful data using {fakir}, </em><a href="https://towardsdatascience.com/create-fake-but-meaningful-data-using-fakir-b193df1f4c94" class="external-link">https://towardsdatascience.com/create-fake-but-meaningful-data-using-fakir-b193df1f4c94</a>.</p>
+
+<p>Dima Diachkov (2023). Blog : <em>How to create purely fictional datasets in R with the fakir package, </em><a href="https://blog.devgenius.io/how-to-create-purely-fictional-datasets-in-r-with-fakir-package-5c527516c682" class="external-link">https://blog.devgenius.io/how-to-create-purely-fictional-datasets-in-r-with-fakir-package-5c527516c682 </a>.</p>
+
+<p>Abdul Majed Raja, alias 1littlecoder (2020). Vidéo : <em>Create meaningful fake tidy datasets in R using fakir \[#rstats Package\], </em><a href="https://www.youtube.com/watch?v=EhhljL5zaWs" class="external-link">https://www.youtube.com/watch?v=EhhljL5zaWs</a>.</p>
